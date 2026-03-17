@@ -20,6 +20,7 @@ async def generate_scorecard(
     transcript: str,
     messages: list[dict],
     problem: str,
+    language: str = "python",
 ) -> dict:
     """
     Generate a structured interview scorecard using AI.
@@ -110,13 +111,43 @@ def _parse_scorecard(content: str) -> dict:
         # Validate and clamp scores
         for key in ["technical_score", "problem_solving_score", "communication_score"]:
             score = scorecard.get(key, 5)
-            scorecard[key] = max(1, min(10, int(score)))
+            try:
+                scorecard[key] = max(1, min(10, int(score)))
+            except (ValueError, TypeError):
+                scorecard[key] = 5
         
-        # Ensure required fields exist
+        # Compute overall_score as average of individual scores
+        scorecard["overall_score"] = round(
+            (scorecard["technical_score"] + scorecard["problem_solving_score"] + scorecard["communication_score"]) / 3,
+            1,
+        )
+        
+        # Ensure required fields exist and are correct types
         scorecard.setdefault("feedback", "Interview completed.")
-        scorecard.setdefault("strengths", [])
-        scorecard.setdefault("improvements", [])
-        scorecard.setdefault("detailed_feedback", {})
+        if not isinstance(scorecard.get("feedback"), str):
+            scorecard["feedback"] = "Interview completed."
+        
+        # Ensure strengths is always a list of strings
+        strengths = scorecard.get("strengths")
+        if isinstance(strengths, str):
+            scorecard["strengths"] = [strengths]
+        elif not isinstance(strengths, list):
+            scorecard["strengths"] = ["Completed the interview"]
+        else:
+            scorecard["strengths"] = [str(s) for s in strengths if s]
+        
+        # Ensure improvements is always a list of strings
+        improvements = scorecard.get("improvements")
+        if isinstance(improvements, str):
+            scorecard["improvements"] = [improvements]
+        elif not isinstance(improvements, list):
+            scorecard["improvements"] = ["Consider explaining your thought process more clearly"]
+        else:
+            scorecard["improvements"] = [str(s) for s in improvements if s]
+        
+        # Ensure detailed_feedback is a dict
+        if not isinstance(scorecard.get("detailed_feedback"), dict):
+            scorecard["detailed_feedback"] = {}
         
         return scorecard
 
@@ -131,6 +162,7 @@ def _default_scorecard() -> dict:
         "technical_score": 5,
         "problem_solving_score": 5,
         "communication_score": 5,
+        "overall_score": 5,
         "feedback": "Interview evaluation could not be fully generated. A default score has been assigned.",
         "strengths": ["Completed the interview"],
         "improvements": ["Consider explaining your thought process more clearly"],

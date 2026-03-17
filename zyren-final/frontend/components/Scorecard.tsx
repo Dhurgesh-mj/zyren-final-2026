@@ -15,7 +15,21 @@ type ScorecardProps = {
   };
 };
 
-export default function Scorecard({ scorecard }: ScorecardProps) {
+export default function Scorecard({ scorecard: rawScorecard }: ScorecardProps) {
+  // Defensive defaults for all properties
+  const scorecard = {
+    technical_score: rawScorecard.technical_score ?? 5,
+    problem_solving_score: rawScorecard.problem_solving_score ?? 5,
+    communication_score: rawScorecard.communication_score ?? 5,
+    overall_score: rawScorecard.overall_score ?? Math.round(
+      ((rawScorecard.technical_score ?? 5) + (rawScorecard.problem_solving_score ?? 5) + (rawScorecard.communication_score ?? 5)) / 3
+    ),
+    feedback: rawScorecard.feedback ?? 'Interview completed.',
+    strengths: Array.isArray(rawScorecard.strengths) ? rawScorecard.strengths : ['Completed the interview'],
+    improvements: Array.isArray(rawScorecard.improvements) ? rawScorecard.improvements : ['Consider explaining your approach'],
+    detailed_feedback: rawScorecard.detailed_feedback ?? {},
+  };
+
   const scores = [
     {
       label: 'Technical Accuracy',

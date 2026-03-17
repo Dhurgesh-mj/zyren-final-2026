@@ -57,21 +57,28 @@ async def execute_code(
         logger.warning("Docker not available, falling back to local execution")
         return _execute_locally(code, language, stdin)
 
-    # Determine execution command
-    if language == "python":
-        image = "python:3.11-slim"
-        cmd = ["python", "-c", code]
-    elif language == "javascript":
-        image = "node:20-slim"
-        cmd = ["node", "-e", code]
-    else:
+    # Determine execution command based on language
+    lang_configs = {
+        "python": ("python:3.11-slim", ["python", "-c", code]),
+        "javascript": ("node:20-slim", ["node", "-e", code]),
+        "java": ("eclipse-temurin:17-jdk", ["bash", "-c", f"echo '{code}' > Main.java && javac Main.java && java Main"]),
+        "cpp": ("gcc:13", ["bash", "-c", f"echo '{code}' > main.cpp && g++ -o main main.cpp && ./main"]),
+        "c": ("gcc:13", ["bash", "-c", f"echo '{code}' > main.c && gcc -o main main.c && ./main"]),
+        "go": ("golang:1.21", ["bash", "-c", f"echo 'package main\nfunc main(){{\n{code}\n}}' > main.go && go run main.go"]),
+        "rust": ("rust:1.75", ["bash", "-c", "echo 'fn main() { ' > main.rs && echo \"" + code.replace('"', '\\"') + "\" >> main.rs && echo '}' >> main.rs && rustc main.rs && ./main"]),
+        "typescript": ("node:20-slim", ["bash", "-c", f"npm install -g typescript && tsc --version && echo '{code}' > main.ts && tsc main.ts && node main.js"]),
+    }
+    
+    if language not in lang_configs:
         return {
             "stdout": "",
-            "stderr": f"Unsupported language: {language}",
+            "stderr": f"Unsupported language: {language}. Supported: {', '.join(lang_configs.keys())}",
             "execution_time": 0,
             "exit_code": 1,
             "timed_out": False,
         }
+    
+    image, cmd = lang_configs[language]
 
     container = None
     start_time = time.time()

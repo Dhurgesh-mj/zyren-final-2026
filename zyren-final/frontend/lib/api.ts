@@ -20,14 +20,18 @@ export const api = {
   get baseUrl() { return API_URL; },
   get wsUrl() { return getWsUrl(); },
 
-  async fetch(path: string, options: RequestInit = {}) {
+  async fetch(path: string, options: RequestInit = {}, token?: string) {
     const url = `${API_URL}${path}`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string>),
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
     const res = await fetch(url, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
     });
     if (!res.ok) {
       const error = await res.json().catch(() => ({ detail: res.statusText }));
@@ -86,6 +90,57 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ code }),
     });
+  },
+
+  // Profile
+  async getProfile(token?: string) {
+    return this.fetch('/api/profile', {}, token);
+  },
+
+  async updateProfile(data: Record<string, any>, token?: string) {
+    return this.fetch('/api/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, token);
+  },
+
+  async getProfileStats(token?: string) {
+    return this.fetch('/api/profile/stats', {}, token);
+  },
+
+  // AI Problem Generation
+  async generateProblem(difficulty: string = 'Medium', category: string = 'Arrays', topic: string = '') {
+    return this.fetch(`/api/generate-problem?difficulty=${difficulty}&category=${category}&topic=${topic}`, {
+      method: 'POST',
+    });
+  },
+
+  async generateProblems(count: number = 5, difficulty: string = 'Mixed', categories?: string[]) {
+    const params = new URLSearchParams({
+      count: count.toString(),
+      difficulty,
+    });
+    if (categories) {
+      categories.forEach(cat => params.append('categories', cat));
+    }
+    return this.fetch(`/api/generate-problems?${params}`, {
+      method: 'POST',
+    });
+  },
+
+  async getCategories() {
+    return this.fetch('/api/categories');
+  },
+
+  async saveProblem(problemData: Record<string, any>) {
+    return this.fetch('/api/save-problem', {
+      method: 'POST',
+      body: JSON.stringify(problemData),
+    });
+  },
+
+  async getMyProblems(limit: number = 20, offset: number = 0) {
+    return this.fetch(`/api/my-problems?limit=${limit}&offset=${offset}`);
   },
 
   // WebSocket connections

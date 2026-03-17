@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Brain, Code2, Mic, BarChart3, Play, ChevronRight,
-  Zap, Shield, MessageSquare, Sparkles, Activity, ArrowRight,
+  Zap, Shield, MessageSquare, Sparkles, Activity, ArrowRight, LogOut, User,
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Problem = {
   id: string;
@@ -59,9 +61,15 @@ export default function HomePage() {
           </div>
           <span className="text-lg font-bold">InterviewLens</span>
         </div>
-        <Link href="/history" className="text-sm text-white/40 hover:text-white/70 transition-colors">
-          History →
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/history" className="text-sm text-white/40 hover:text-white/70 transition-colors">
+            History
+          </Link>
+          <Link href="/profile" className="text-sm text-white/40 hover:text-white/70 transition-colors">
+            Profile
+          </Link>
+          <AuthNav />
+        </div>
       </nav>
 
       {/* ─── Hero ─── */}
@@ -202,6 +210,53 @@ export default function HomePage() {
           <span className="text-xs text-white/20">Powered by Llama 3.2 + Whisper</span>
         </div>
       </footer>
+    </div>
+  );
+}
+
+// Auth Navigation Component
+function AuthNav() {
+  const { user, isAuthenticated, logout, loading } = useAuth();
+  const router = useRouter();
+
+  if (loading) {
+    return <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />;
+  }
+
+  if (isAuthenticated) {
+    return (
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 text-sm text-white/60">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+            <User className="w-4 h-4 text-white" />
+          </div>
+          <span>{user?.name}</span>
+        </div>
+        <button
+          onClick={() => { logout(); router.push('/'); }}
+          className="text-sm text-white/40 hover:text-white/70 transition-colors"
+          title="Logout"
+        >
+          <LogOut className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Link
+        href="/login"
+        className="text-sm text-white/60 hover:text-white transition-colors"
+      >
+        Sign In
+      </Link>
+      <Link
+        href="/register"
+        className="text-sm bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors"
+      >
+        Sign Up
+      </Link>
     </div>
   );
 }

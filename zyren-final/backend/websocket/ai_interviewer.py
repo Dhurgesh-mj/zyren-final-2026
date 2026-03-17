@@ -70,7 +70,15 @@ async def ai_interviewer_websocket(websocket: WebSocket):
     except WebSocketDisconnect:
         logger.info("AI interviewer disconnected: %s", connection_id)
     except Exception as e:
-        logger.error("AI interviewer error: %s", e)
+        import traceback
+        logger.error("AI interviewer error: %s\n%s", e, traceback.format_exc())
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "message": f"Server error: {str(e)}",
+            })
+        except:
+            pass
     finally:
         ai_sessions.pop(connection_id, None)
 
@@ -164,8 +172,13 @@ async def _handle_code_update(websocket: WebSocket, connection_id: str, message:
     interview_id = session["interview_id"]
     interviewer = session["interviewer"]
 
-    # Update stored code
+    # Update stored code and mark as changed
     session["last_code"] = code
+    interviewer.code_context = code
+    interviewer.language = language
+    if code != interviewer.last_code:
+        interviewer.code_has_changed = True
+        interviewer.last_code = code
 
     # Analyze code
     analysis = analyzer.analyze(code, language)
@@ -190,7 +203,6 @@ async def _handle_code_update(websocket: WebSocket, connection_id: str, message:
         follow_up = await interviewer.generate_follow_up(
             code=code,
             ast_analysis=analysis,
-            language=language,
         )
 
         if follow_up:

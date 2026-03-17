@@ -51,7 +51,7 @@ function InterviewContent() {
   const [interviewId, setInterviewId] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'active' | 'ending' | 'completed'>('idle');
   const [code, setCode] = useState('');
-  const [language, setLanguage] = useState<'python' | 'javascript'>('python');
+  const [language, setLanguage] = useState<string>('python');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isAITyping, setIsAITyping] = useState(false);
   const [patterns, setPatterns] = useState<string[]>([]);
@@ -248,6 +248,7 @@ function InterviewContent() {
     try {
       const result = await api.runTests(problem.id, code, language);
       setTestResults(result);
+      setShowOutput(false); // Switch to tests tab
     } catch (err) {
       console.error('Test run failed:', err);
     } finally {
@@ -333,18 +334,24 @@ function InterviewContent() {
     <div className="h-screen flex flex-col bg-[#0a0a0f] overflow-hidden">
 
       {/* ═══ TOP BAR ═══ */}
-      <div className="h-12 flex items-center justify-between px-3 border-b border-white/[0.06] bg-[#10101a]/90 backdrop-blur-md shrink-0">
+      <div className="h-14 flex items-center justify-between px-4 border-b border-white/[0.06] bg-[#10101a]/90 backdrop-blur-md shrink-0">
         {/* Left */}
-        <div className="flex items-center gap-3">
-          <Link href="/" className="text-white/30 hover:text-white/60 transition-colors">
+        <div className="flex items-center gap-4">
+          <Link href="/" className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors">
             <ArrowLeft className="w-4 h-4" />
           </Link>
+          
           <div className="flex items-center gap-2">
-            <Brain className="w-4 h-4 text-indigo-400" />
-            <span className="text-sm font-semibold text-white/80">InterviewLens</span>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+              <Brain className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <span className="text-sm font-semibold text-white/90">InterviewLens</span>
+              <span className="text-white/20 mx-2">/</span>
+              <span className="text-sm text-white/60">{problem.title}</span>
+            </div>
           </div>
-          <div className="h-4 w-px bg-white/10" />
-          <span className="text-sm text-white/50">{problem.title}</span>
+          
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
             problem.difficulty === 'Easy' ? 'bg-emerald-500/20 text-emerald-400' :
             problem.difficulty === 'Medium' ? 'bg-amber-500/20 text-amber-400' :
@@ -362,50 +369,93 @@ function InterviewContent() {
           )}
         </div>
 
-        {/* Center - Timer */}
-        <div className="flex items-center gap-2">
+        {/* Center - Timer & Language */}
+        <div className="flex items-center gap-4">
+          {/* Language selector */}
+          <div className="relative group">
+            <button
+              disabled={status === 'active'}
+              className="flex items-center gap-2 bg-white/[0.06] hover:bg-white/[0.1] disabled:opacity-40 text-white/80 text-sm px-4 py-2 rounded-lg border border-white/[0.08] transition-all"
+            >
+              <Code2 className="w-4 h-4 text-indigo-400" />
+              <span className="capitalize">{language}</span>
+              <ChevronDown className="w-3 h-3 text-white/40" />
+            </button>
+            
+            {/* Language dropdown */}
+            <div className="absolute top-full right-0 mt-1 w-48 bg-[#1a1a2e] border border-white/[0.1] rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+              {[
+                { id: 'python', label: 'Python', color: 'bg-blue-500' },
+                { id: 'javascript', label: 'JavaScript', color: 'bg-yellow-500' },
+                { id: 'java', label: 'Java', color: 'bg-orange-500' },
+                { id: 'cpp', label: 'C++', color: 'bg-purple-500' },
+                { id: 'c', label: 'C', color: 'bg-gray-500' },
+                { id: 'go', label: 'Go', color: 'bg-cyan-500' },
+                { id: 'rust', label: 'Rust', color: 'bg-amber-600' },
+                { id: 'typescript', label: 'TypeScript', color: 'bg-blue-600' },
+              ].map((lang) => (
+                <button
+                  key={lang.id}
+                  onClick={() => {
+                    setLanguage(lang.id);
+                    if (problem?.starter_code?.[lang.id]) {
+                      setCode(problem.starter_code[lang.id]);
+                    } else {
+                      // Default starter code for languages not in problem
+                      const defaults: Record<string, string> = {
+                        python: '# Write your solution here\n',
+                        javascript: '// Write your solution here\n',
+                        java: 'class Solution {\n    // Write your solution here\n}\n',
+                        cpp: '#include <iostream>\nusing namespace std;\n\nint main() {\n    // Write your solution here\n    return 0;\n}\n',
+                        c: '#include <stdio.h>\n\nint main() {\n    // Write your solution here\n    return 0;\n}\n',
+                        go: 'package main\n\nfunc main() {\n    // Write your solution here\n}\n',
+                        rust: 'fn main() {\n    // Write your solution here\n}\n',
+                        typescript: '// Write your solution here\n',
+                      };
+                      setCode(defaults[lang.id] || '// Write your solution here\n');
+                    }
+                  }}
+                  disabled={status === 'active'}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/[0.05] disabled:opacity-40 disabled:cursor-not-allowed first:rounded-t-lg last:rounded-b-lg"
+                >
+                  <span className={`w-2 h-2 rounded-full ${lang.color}`} />
+                  {lang.label}
+                  {language === lang.id && <span className="ml-auto text-indigo-400">✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+          
           {status === 'active' && (
-            <div className="flex items-center gap-1.5 bg-white/[0.04] px-3 py-1 rounded-lg">
-              <Clock className="w-3 h-3 text-emerald-400" />
+            <div className="flex items-center gap-2 bg-white/[0.04] px-3 py-1.5 rounded-lg">
+              <Clock className="w-3.5 h-3.5 text-emerald-400" />
               <Timer isRunning={status === 'active'} />
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             </div>
           )}
         </div>
 
         {/* Right */}
         <div className="flex items-center gap-2">
-          {/* Language */}
-          <div className="relative">
-            <select
-              value={language}
-              onChange={(e) => {
-                const lang = e.target.value as 'python' | 'javascript';
-                setLanguage(lang);
-                if (problem?.starter_code?.[lang]) setCode(problem.starter_code[lang]);
-              }}
-              disabled={status === 'active'}
-              className="appearance-none bg-white/[0.04] text-white/60 text-xs px-3 py-1.5 pr-7 rounded-lg border border-white/[0.06] outline-none cursor-pointer disabled:opacity-40"
-            >
-              <option value="python" className="bg-[#1a1a2e]">Python</option>
-              <option value="javascript" className="bg-[#1a1a2e]">JavaScript</option>
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-white/30 pointer-events-none" />
-          </div>
-
           {/* Interview control */}
           {status === 'idle' ? (
-            <button onClick={startInterview} className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-4 py-1.5 rounded-lg transition-colors">
-              <Play className="w-3 h-3" /> Start Interview
+            <button 
+              onClick={startInterview} 
+              className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition-all shadow-lg shadow-indigo-500/20"
+            >
+              <Play className="w-4 h-4" /> Start Interview
             </button>
           ) : status === 'active' ? (
-            <button onClick={endInterview} className="flex items-center gap-1.5 bg-rose-600/80 hover:bg-rose-500 text-white text-xs font-medium px-4 py-1.5 rounded-lg transition-colors">
-              <Square className="w-3 h-3" /> End
+            <button 
+              onClick={endInterview} 
+              className="flex items-center gap-2 bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition-all shadow-lg shadow-rose-500/20"
+            >
+              <Square className="w-4 h-4" /> End Interview
             </button>
           ) : status === 'ending' ? (
-            <div className="flex items-center gap-1.5 bg-white/[0.04] text-white/40 text-xs px-4 py-1.5 rounded-lg">
-              <div className="w-3 h-3 border border-white/40 border-t-transparent rounded-full animate-spin" />
-              Scoring...
+            <div className="flex items-center gap-2 bg-white/[0.04] text-white/40 text-sm px-4 py-2 rounded-lg">
+              <div className="w-4 h-4 border-2 border-white/40 border-t-transparent rounded-full animate-spin" />
+              Generating Scorecard...
             </div>
           ) : null}
         </div>
@@ -417,246 +467,327 @@ function InterviewContent() {
         {/* ─── LEFT: EDITOR PANEL ─── */}
         <div className="flex-1 flex flex-col min-w-0">
 
-          {/* Problem statement bar */}
-          {showProblem && (
-            <div className="border-b border-white/[0.06] bg-[#0d0d15]">
-              <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.04]">
-                <div className="flex items-center gap-2">
-                  <Eye className="w-3.5 h-3.5 text-indigo-400" />
-                  <span className="text-xs font-medium text-white/50">Problem</span>
-                </div>
-                <button onClick={() => setShowProblem(false)} className="text-white/20 hover:text-white/50 transition-colors">
-                  <X className="w-3.5 h-3.5" />
-                </button>
+          {/* Problem statement - collapsible sidebar style */}
+          <div className="border-b border-white/[0.06] bg-[#0d0d15]">
+            <div className="flex items-center justify-between px-4 py-2 bg-[#12121a]">
+              <div className="flex items-center gap-2">
+                <Eye className="w-4 h-4 text-indigo-400" />
+                <span className="text-sm font-medium text-white/70">Problem Description</span>
               </div>
-              <div className="px-4 py-3 max-h-32 overflow-y-auto custom-scrollbar">
-                <h3 className="text-sm font-semibold text-white/80 mb-1.5">{problem.title}</h3>
-                <p className="text-xs text-white/40 leading-relaxed whitespace-pre-wrap">{problem.description}</p>
-              </div>
+              <button 
+                onClick={() => setShowProblem(!showProblem)} 
+                className="text-white/30 hover:text-white/60 transition-colors text-xs flex items-center gap-1"
+              >
+                {showProblem ? 'Hide' : 'Show'}
+                <ChevronDown className={`w-3 h-3 transition-transform ${showProblem ? 'rotate-180' : ''}`} />
+              </button>
             </div>
-          )}
-
-          {/* Show problem toggle when hidden */}
-          {!showProblem && (
-            <button
-              onClick={() => setShowProblem(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-white/30 hover:text-white/50 border-b border-white/[0.06] bg-[#0d0d15] transition-colors"
-            >
-              <EyeOff className="w-3 h-3" /> Show Problem
-            </button>
-          )}
+            {showProblem && (
+              <div className="px-4 py-3 max-h-36 overflow-y-auto custom-scrollbar">
+                <h3 className="text-sm font-semibold text-white/90 mb-2">{problem.title}</h3>
+                <p className="text-xs text-white/50 leading-relaxed whitespace-pre-wrap">{problem.description}</p>
+              </div>
+            )}
+          </div>
 
           {/* Monaco Editor */}
-          <div className="flex-1 relative">
+          <div className="flex-1 relative bg-[#1e1e2e] min-h-0 overflow-hidden">
+            {/* Editor Header */}
+            <div className="h-10 flex items-center justify-between px-4 bg-[#252536] border-b border-white/[0.06]">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                  <div className="w-3 h-3 rounded-full bg-amber-500/80" />
+                  <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
+                </div>
+                <div className="h-4 w-px bg-white/10" />
+                <span className="text-xs text-white/40 font-mono">
+                  {language === 'python' ? 'solution.py' : 
+                   language === 'javascript' ? 'solution.js' :
+                   language === 'java' ? 'Solution.java' :
+                   language === 'cpp' ? 'solution.cpp' :
+                   language === 'c' ? 'solution.c' :
+                   language === 'go' ? 'solution.go' :
+                   language === 'rust' ? 'solution.rs' :
+                   language === 'typescript' ? 'solution.ts' : 'solution.txt'}
+                </span>
+              </div>
+              
+              {/* Quick actions */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={runCode}
+                  disabled={isRunning || isRunningTests}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/80 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs rounded-md transition-all"
+                >
+                  <Play className="w-3 h-3" />
+                  Run
+                </button>
+                <button
+                  onClick={runTests}
+                  disabled={isRunningTests || isRunning}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/80 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs rounded-md transition-all"
+                >
+                  <CheckCircle className="w-3 h-3" />
+                  Test
+                </button>
+              </div>
+            </div>
+            
+            {/* Monaco Editor */}
             {mounted ? (
-              <MonacoEditor
-                height="100%"
-                language={language === 'javascript' ? 'javascript' : 'python'}
-                value={code}
-                onChange={(v) => handleCodeChange(v || '')}
-                onMount={(editor) => {
-                  editorRef.current = editor;
-                  editor.addAction({
-                    id: 'run-code',
-                    label: 'Run Code',
-                    keybindings: [2048 | 3],
-                    run: () => runCode(),
-                  });
-                  editor.focus();
-                }}
-                theme="vs-dark"
-                options={{
-                  minimap: { enabled: false },
-                  fontSize: 14,
-                  fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-                  fontLigatures: true,
-                  lineHeight: 22,
-                  padding: { top: 12, bottom: 12 },
-                  scrollBeyondLastLine: false,
-                  wordWrap: 'on',
-                  automaticLayout: true,
-                  tabSize: 4,
-                  cursorBlinking: 'smooth',
-                  cursorSmoothCaretAnimation: 'on',
-                  smoothScrolling: true,
-                  bracketPairColorization: { enabled: true },
-                  renderLineHighlight: 'all',
-                  glyphMargin: false,
-                  folding: true,
-                }}
-              />
+              <div className="h-[calc(100%-40px)]">
+                <MonacoEditor
+                  height="100%"
+                  language={language}
+                  value={code}
+                  onChange={(v) => handleCodeChange(v || '')}
+                  onMount={(editor) => {
+                    editorRef.current = editor;
+                    editor.addAction({
+                      id: 'run-code',
+                      label: 'Run Code',
+                      keybindings: [2048 | 3],
+                      run: () => runCode(),
+                    });
+                    editor.focus();
+                  }}
+                  theme="vs-dark"
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 14,
+                    fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+                    fontLigatures: true,
+                    lineHeight: 24,
+                    padding: { top: 16, bottom: 16 },
+                    scrollBeyondLastLine: false,
+                    wordWrap: 'on',
+                    automaticLayout: true,
+                    tabSize: 4,
+                    cursorBlinking: 'smooth',
+                    cursorSmoothCaretAnimation: 'on',
+                    smoothScrolling: true,
+                    bracketPairColorization: { enabled: true },
+                    renderLineHighlight: 'all',
+                    glyphMargin: false,
+                    folding: true,
+                    lineNumbers: 'on',
+                    renderWhitespace: 'selection',
+                    guides: {
+                      indentation: true,
+                      bracketPairs: true,
+                    },
+                  }}
+                />
+              </div>
             ) : (
-              <div className="flex-1 flex items-center justify-center bg-[#1e1e2e]">
+              <div className="h-[calc(100%-40px)] flex items-center justify-center">
                 <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
               </div>
             )}
-
-            {/* Run button overlay */}
-            <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
-              {/* Pattern badges */}
-              {patterns.length > 0 && (
-                <div className="flex items-center gap-1">
-                  {patterns.slice(0, 3).map(p => {
-                    const info = patternInfo[p] || { label: p, color: 'bg-white/10 text-white/50' };
-                    return (
-                      <span key={p} className={`text-[9px] font-medium px-2 py-0.5 rounded-full ${info.color}`}>
-                        {info.label}
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-              <button
-                onClick={runTests}
-                disabled={isRunningTests}
-                className="flex items-center gap-1.5 bg-indigo-600/90 hover:bg-indigo-500 disabled:bg-white/10 disabled:text-white/30 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all backdrop-blur-sm"
-              >
-                {isRunningTests ? (
-                  <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <CheckCircle className="w-3 h-3" />
-                )}
-                {isRunningTests ? 'Testing...' : 'Tests'}
-              </button>
-              <button
-                onClick={runCode}
-                disabled={isRunning}
-                className="flex items-center gap-1.5 bg-emerald-600/90 hover:bg-emerald-500 disabled:bg-white/10 disabled:text-white/30 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all backdrop-blur-sm"
-              >
-                {isRunning ? (
-                  <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Play className="w-3 h-3" />
-                )}
-                {isRunning ? 'Running...' : 'Run ⌘↵'}
-              </button>
-            </div>
           </div>
 
-          {/* Output panel */}
-          {showOutput && output && (
+          {/* Output & Tests Panel - Tabs */}
+          {(showOutput || testResults) && (
             <div className="border-t border-white/[0.06] bg-[#0d0d15]">
-              <div className="flex items-center justify-between px-4 py-1.5">
-                <div className="flex items-center gap-2">
-                  <TerminalIcon className="w-3.5 h-3.5 text-white/30" />
-                  <span className="text-xs font-medium text-white/40">Output</span>
-                  {output.exit_code === 0 ? (
-                    <CheckCircle className="w-3 h-3 text-emerald-400" />
-                  ) : (
-                    <AlertTriangle className="w-3 h-3 text-rose-400" />
+              {/* Tabs */}
+              <div className="flex items-center justify-between px-4 border-b border-white/[0.04]">
+                <div className="flex items-center gap-1">
+                  {output && (
+                    <button
+                      onClick={() => setShowOutput(true)}
+                      className={`flex items-center gap-2 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+                        showOutput
+                          ? 'text-white border-emerald-500'
+                          : 'text-white/40 border-transparent hover:text-white/60'
+                      }`}
+                    >
+                      <TerminalIcon className="w-3.5 h-3.5" />
+                      Output
+                      {output.exit_code === 0 ? (
+                        <CheckCircle className="w-3 h-3 text-emerald-400" />
+                      ) : (
+                        <AlertTriangle className="w-3 h-3 text-rose-400" />
+                      )}
+                    </button>
                   )}
-                  <span className="text-[10px] text-white/20">{output.execution_time}s</span>
+                  {testResults && (
+                    <button
+                      onClick={() => setShowOutput(false)}
+                      className={`flex items-center gap-2 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+                        !showOutput
+                          ? 'text-white border-indigo-500'
+                          : 'text-white/40 border-transparent hover:text-white/60'
+                      }`}
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      Test Results
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                        testResults.failed > 0 
+                          ? 'bg-rose-500/20 text-rose-400' 
+                          : 'bg-emerald-500/20 text-emerald-400'
+                      }`}>
+                        {testResults.passed}/{testResults.total_tests}
+                      </span>
+                    </button>
+                  )}
                 </div>
-                <button onClick={() => setShowOutput(false)} className="text-white/20 hover:text-white/40">
+                <button 
+                  onClick={() => { setShowOutput(false); setTestResults(null); }} 
+                  className="text-white/20 hover:text-white/40 p-1"
+                >
                   <X className="w-3 h-3" />
                 </button>
               </div>
-              <div className="px-4 pb-3 max-h-32 overflow-y-auto font-mono text-xs">
-                {output.stdout && <pre className="text-emerald-300/80 whitespace-pre-wrap">{output.stdout}</pre>}
-                {output.stderr && <pre className="text-rose-400/80 whitespace-pre-wrap">{output.stderr}</pre>}
-                {output.timed_out && <p className="text-amber-400">⏱ Execution timed out</p>}
-                {!output.stdout && !output.stderr && !output.timed_out && (
-                  <p className="text-white/20 italic">No output</p>
+              
+              {/* Content */}
+              <div className="h-60 overflow-y-auto">
+                {showOutput && output && (
+                  <div className="px-4 py-3 font-mono text-xs">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[10px] text-white/30">{output.execution_time}s</span>
+                      {output.timed_out && <span className="text-amber-400 text-[10px]">⏱ Timed out</span>}
+                    </div>
+                    {output.stdout && <pre className="text-emerald-300/80 whitespace-pre-wrap">{output.stdout}</pre>}
+                    {output.stderr && <pre className="text-rose-400/80 whitespace-pre-wrap">{output.stderr}</pre>}
+                    {!output.stdout && !output.stderr && !output.timed_out && (
+                      <p className="text-white/20 italic">No output</p>
+                    )}
+                  </div>
+                )}
+                
+                {!showOutput && testResults && (
+                  <TestResults
+                    results={testResults.results || []}
+                    totalTests={testResults.total_tests || 0}
+                    passed={testResults.passed || 0}
+                    failed={testResults.failed || 0}
+                    isRunning={isRunningTests}
+                  />
                 )}
               </div>
-            </div>
-            )}
-          
-          {/* Test Results panel */}
-          {testResults && (
-            <div className="border-t border-white/[0.06] bg-[#0d0d15]">
-              <TestResults
-                results={testResults.results || []}
-                totalTests={testResults.total_tests || 0}
-                passed={testResults.passed || 0}
-                failed={testResults.failed || 0}
-                isRunning={isRunningTests}
-              />
             </div>
           )}
         </div>
 
         {/* ─── RIGHT: AI CHAT + VOICE ─── */}
-        <div className="w-[380px] flex flex-col border-l border-white/[0.06] bg-[#0c0c14]">
+        <div className="w-[400px] flex flex-col border-l border-white/[0.06] bg-[#0c0c14]">
 
           {/* Chat header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                <Bot className="w-4 h-4 text-white" />
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] bg-[#10101a]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <Bot className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="text-xs font-semibold text-white/80">AI Interviewer</p>
-                <p className="text-[10px] text-white/30">
+                <p className="text-sm font-semibold text-white/90">AI Interviewer</p>
+                <p className="text-xs text-white/40">
                   {status === 'active' ? (
-                    <span className="flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
-                      Watching your code...
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                      <span className="text-emerald-400">Live</span> · Watching your code
                     </span>
-                  ) : 'Start interview to begin'}
+                  ) : (
+                    <span className="text-white/30">Start interview to begin</span>
+                  )}
                 </p>
               </div>
             </div>
+            
+            {/* Voice controls */}
             <div className="flex items-center gap-2">
-              {isAITyping && (
-                <span className="text-[10px] text-indigo-400 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" /> Thinking
-                </span>
-              )}
-              {aiVoice.isSpeaking && (
-                <span className="text-[10px] text-purple-400 flex items-center gap-1">
-                  <Volume2 className="w-3 h-3 animate-pulse" /> Speaking
-                </span>
-              )}
               {/* AI Voice toggle */}
               <button
                 onClick={aiVoice.toggle}
-                title={aiVoice.enabled ? 'Mute AI voice' : 'Unmute AI voice'}
-                className={`p-1 rounded transition-colors ${
+                title={aiVoice.enabled ? 'Mute AI voice (TTS)' : 'Enable AI voice (TTS)'}
+                className={`p-2 rounded-lg transition-colors ${
                   aiVoice.enabled
-                    ? 'text-purple-400 hover:bg-purple-500/10'
-                    : 'text-white/20 hover:bg-white/5'
+                    ? 'text-purple-400 bg-purple-500/10'
+                    : 'text-white/30 hover:bg-white/5'
                 }`}
               >
-                {aiVoice.enabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                {aiVoice.enabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
               </button>
             </div>
           </div>
-
-          {/* Voice indicator bar */}
-          {status === 'active' && (
-            <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.04] bg-white/[0.02]">
-              <div className="flex items-center gap-2">
-                <Radio className={`w-3 h-3 ${voice.isRecording ? 'text-emerald-400' : 'text-white/20'}`} />
-                <span className="text-[10px] text-white/40">
-                  {voice.isRecording ? (voice.isSpeaking ? '🎙️ Listening...' : 'Mic active') : 'Mic off'}
+          
+          {/* AI Status bar */}
+          <div className="flex items-center justify-between px-4 py-2 bg-[#0d0d15] border-b border-white/[0.04]">
+            <div className="flex items-center gap-3">
+              {isAITyping && (
+                <span className="text-xs text-indigo-400 flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3" /> AI is thinking...
                 </span>
-              </div>
-              <div className="flex items-center gap-2">
-                {/* Live waveform */}
+              )}
+              {aiVoice.isSpeaking && !isAITyping && (
+                <span className="text-xs text-purple-400 flex items-center gap-1.5">
+                  <Volume2 className="w-3 h-3 animate-pulse" /> AI is speaking...
+                </span>
+              )}
+              {!isAITyping && !aiVoice.isSpeaking && status === 'active' && (
+                <span className="text-xs text-white/30">Waiting for your response...</span>
+              )}
+            </div>
+          </div>
+
+          {/* Voice control bar */}
+          {status === 'active' && (
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.04] bg-[#0d0d15]">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={voice.isRecording ? voice.stopRecording : voice.startRecording}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    voice.isRecording
+                      ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                      : 'bg-white/[0.04] text-white/60 hover:bg-white/[0.08] border border-white/[0.06]'
+                  }`}
+                >
+                  {voice.isRecording ? (
+                    <>
+                      <MicOff className="w-4 h-4" />
+                      <span>Stop Recording</span>
+                      <div className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-4 h-4" />
+                      <span>Start Voice</span>
+                    </>
+                  )}
+                </button>
+                
+                {/* Waveform visualization */}
                 {voice.isRecording && (
-                  <div className="flex items-center gap-px h-4">
-                    {Array.from({ length: 12 }).map((_, i) => (
+                  <div className="flex items-center gap-px h-6">
+                    {Array.from({ length: 16 }).map((_, i) => (
                       <div
                         key={i}
-                        className={`w-[2px] rounded-full transition-all duration-100 ${voice.isSpeaking ? 'bg-emerald-400' : 'bg-white/10'}`}
+                        className={`w-[3px] rounded-full transition-all duration-150 ${
+                          voice.isSpeaking ? 'bg-emerald-400' : 'bg-white/10'
+                        }`}
                         style={{
-                          height: voice.isSpeaking ? `${Math.random() * 14 + 4}px` : '3px',
+                          height: voice.isSpeaking ? `${Math.random() * 20 + 6}px` : '4px',
+                          animationDelay: `${i * 50}ms`,
                         }}
                       />
                     ))}
                   </div>
                 )}
-                <button
-                  onClick={voice.isRecording ? voice.stopRecording : voice.startRecording}
-                  className={`p-1 rounded transition-colors ${
-                    voice.isRecording
-                      ? 'text-rose-400 hover:bg-rose-500/10'
-                      : 'text-white/30 hover:bg-white/5'
-                  }`}
-                >
-                  {voice.isRecording ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-                </button>
+              </div>
+              
+              <div className="text-xs text-white/40">
+                {voice.isRecording ? (
+                  voice.isSpeaking ? (
+                    <span className="text-emerald-400 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      Listening...
+                    </span>
+                  ) : (
+                    <span>Waiting for speech...</span>
+                  )
+                ) : (
+                  <span>Click to speak</span>
+                )}
               </div>
             </div>
           )}
@@ -664,49 +795,49 @@ function InterviewContent() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 custom-scrollbar">
             {status === 'idle' && (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center mb-4">
-                  <Brain className="w-8 h-8 text-indigo-400/60" />
+              <div className="flex flex-col items-center justify-center h-full text-center px-6">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/10">
+                  <Brain className="w-10 h-10 text-indigo-400/60" />
                 </div>
-                <p className="text-sm text-white/40 mb-1">Ready to begin</p>
-                <p className="text-xs text-white/20 max-w-[240px]">
-                  Click "Start Interview" to begin. The AI will watch your code in real-time and ask follow-up questions.
+                <p className="text-base text-white/50 mb-2 font-medium">Ready to Begin</p>
+                <p className="text-sm text-white/30 leading-relaxed">
+                  Click "Start Interview" to begin. The AI will watch your code in real-time, ask follow-up questions, and provide feedback.
                 </p>
               </div>
             )}
 
             {messages.filter(m => m.role !== 'system').map((msg, i) => (
-              <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.role === 'assistant' && (
-                  <div className="w-6 h-6 rounded-md bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Bot className="w-3 h-3 text-white" />
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/20">
+                    <Bot className="w-4 h-4 text-white" />
                   </div>
                 )}
-                <div className={`max-w-[280px] px-3 py-2 rounded-xl text-xs leading-relaxed ${
+                <div className={`max-w-[280px] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
                   msg.role === 'user'
-                    ? 'bg-indigo-600/30 text-indigo-100 rounded-br-sm'
-                    : 'bg-white/[0.04] text-white/70 rounded-bl-sm border border-white/[0.06]'
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-br-md'
+                    : 'bg-white/[0.06] text-white/80 rounded-bl-md border border-white/[0.08]'
                 }`}>
                   {msg.content}
                 </div>
                 {msg.role === 'user' && (
-                  <div className="w-6 h-6 rounded-md bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <User className="w-3 h-3 text-white" />
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/20">
+                    <User className="w-4 h-4 text-white" />
                   </div>
                 )}
               </div>
             ))}
 
             {isAITyping && (
-              <div className="flex gap-2.5">
-                <div className="w-6 h-6 rounded-md bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                  <Bot className="w-3 h-3 text-white" />
+              <div className="flex gap-3">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/20">
+                  <Bot className="w-4 h-4 text-white" />
                 </div>
-                <div className="bg-white/[0.04] border border-white/[0.06] px-3 py-2 rounded-xl rounded-bl-sm">
-                  <div className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}} />
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}} />
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}} />
+                <div className="bg-white/[0.06] border border-white/[0.08] px-4 py-3 rounded-2xl rounded-bl-md">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}} />
+                    <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}} />
+                    <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}} />
                   </div>
                 </div>
               </div>
@@ -714,9 +845,12 @@ function InterviewContent() {
 
             {/* Voice transcript snippet */}
             {voice.transcript && status === 'active' && (
-              <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg px-3 py-2">
-                <p className="text-[10px] text-emerald-400/60 font-medium mb-0.5">Latest transcript</p>
-                <p className="text-xs text-white/40 line-clamp-2">{voice.transcript.slice(-120)}</p>
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Mic className="w-3 h-3 text-emerald-400" />
+                  <p className="text-[11px] text-emerald-400 font-medium">Your voice input</p>
+                </div>
+                <p className="text-sm text-white/60 line-clamp-2">{voice.transcript.slice(-200)}</p>
               </div>
             )}
 
@@ -724,26 +858,26 @@ function InterviewContent() {
           </div>
 
           {/* Chat input */}
-          <form onSubmit={handleChatSubmit} className="px-3 pb-3 pt-2 border-t border-white/[0.06]">
+          <form onSubmit={handleChatSubmit} className="px-4 pb-4 pt-3 border-t border-white/[0.06] bg-[#0d0d15]">
             <div className="flex gap-2">
               <input
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder={status === 'active' ? "Type or speak your answer..." : "Start interview first..."}
+                placeholder={status === 'active' ? "Type your answer..." : "Start interview to chat..."}
                 disabled={status !== 'active' || isAITyping}
-                className="flex-1 bg-white/[0.04] border border-white/[0.06] text-white/80 text-xs rounded-lg px-3 py-2 outline-none placeholder:text-white/20 focus:border-indigo-500/30 disabled:opacity-40 transition-colors"
+                className="flex-1 bg-white/[0.06] border border-white/[0.08] text-white/80 text-sm rounded-xl px-4 py-3 outline-none placeholder:text-white/25 focus:border-indigo-500/30 focus:bg-white/[0.08] disabled:opacity-40 transition-all"
               />
               <button
                 type="submit"
                 disabled={!chatInput.trim() || status !== 'active' || isAITyping}
-                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-white/5 disabled:text-white/20 text-white p-2 rounded-lg transition-colors"
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-white/10 disabled:to-white/10 disabled:text-white/30 text-white p-3 rounded-xl transition-all shadow-lg shadow-indigo-500/20 disabled:shadow-none"
               >
-                <Send className="w-3.5 h-3.5" />
+                <Send className="w-5 h-5" />
               </button>
             </div>
             {voice.error && (
-              <p className="text-[10px] text-rose-400/60 mt-1.5 px-1">{voice.error}</p>
+              <p className="text-xs text-rose-400/80 mt-2 px-1">{voice.error}</p>
             )}
           </form>
         </div>
