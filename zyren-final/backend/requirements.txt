@@ -1,0 +1,57 @@
+# InterviewLens Backend
+# NOTE: Run `pip install setuptools wheel` first on Python 3.14+
+
+# Core
+setuptools>=75.0.0
+wheel
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+websockets>=14.0
+
+# Database
+sqlalchemy[asyncio]>=2.0.36
+asyncpg>=0.30.0
+psycopg2-binary>=2.9.10
+alembic>=1.14.0
+
+# Validation & Config
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+python-multipart>=0.0.19
+python-dotenv>=1.0.1
+
+# Auth
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# HTTP
+httpx>=0.28.0
+
+# AI / ML - Whisper & Torch
+# NOTE: If torch fails on Python 3.14, use: pip install --pre torch torchaudio
+torch>=2.5.0
+torchaudio>=2.5.0
+openai-whisper>=20240930
+numpy>=1.26.0
+
+# Audio
+soundfile>=0.12.1
+
+# VAD
+# silero-vad may not have 3.14 wheels; torch.hub.load works as fallback
+# silero-vad>=5.1.0
+
+# AST / Code Analysis
+tree-sitter>=0.23.0
+tree-sitter-python>=0.23.0
+tree-sitter-javascript>=0.23.0
+
+# Docker SDK
+docker>=7.1.0
+
+# Computer Vision (optional - skip if install fails)
+# opencv-python-headless>=4.10.0
+# mediapipe>=0.10.18
+
+# Utilities
+aiofiles>=24.1.0
