@@ -299,6 +299,70 @@ async def execute_code_endpoint(data: CodeExecutionRequest):
     return result
 
 
+@router.post("/run-tests")
+async def run_tests_endpoint(
+    data: CodeExecutionRequest,
+    problem_id: str = "two-sum",
+    language: str = "python",
+):
+    """Run test cases against user code."""
+    # Find problem
+    problem = None
+    for p in PROBLEMS:
+        if p["id"] == problem_id:
+            problem = p
+            break
+    if not problem:
+        raise HTTPException(status_code=404, detail="Problem not found")
+
+    test_cases = problem.get("test_cases", [])
+    if not test_cases:
+        return {"results": [], "total_tests": 0, "passed": 0, "failed": 0}
+
+    results = []
+    passed_count = 0
+
+    for i, tc in enumerate(test_cases):
+        test_code = data.code + f"\nprint({tc['input']})"
+        try:
+            exec_result = await execute_code(
+                code=test_code,
+                language=language,
+                stdin="",
+            )
+            actual = exec_result.get("stdout", "").strip() if isinstance(exec_result, dict) else str(exec_result.stdout).strip()
+            expected = tc["expected"].strip()
+            is_passed = actual == expected
+
+            if is_passed:
+                passed_count += 1
+
+            results.append({
+                "name": f"Test {i + 1}: {tc['input'][:40]}",
+                "input": tc["input"],
+                "expected": expected,
+                "actual": actual,
+                "passed": is_passed,
+                "error": exec_result.get("stderr", "") if isinstance(exec_result, dict) else str(exec_result.stderr) if not is_passed else None,
+            })
+        except Exception as e:
+            results.append({
+                "name": f"Test {i + 1}: {tc['input'][:40]}",
+                "input": tc["input"],
+                "expected": tc["expected"],
+                "actual": "",
+                "passed": False,
+                "error": str(e),
+            })
+
+    return {
+        "results": results,
+        "total_tests": len(test_cases),
+        "passed": passed_count,
+        "failed": len(test_cases) - passed_count,
+    }
+
+
 @router.get("/interviews")
 async def list_interviews(
     db: AsyncSession = Depends(get_db),

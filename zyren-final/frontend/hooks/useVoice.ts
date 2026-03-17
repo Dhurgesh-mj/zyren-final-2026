@@ -6,6 +6,7 @@ type UseVoiceOptions = {
   onTranscript?: (text: string) => void;
   onSpeechEnd?: (transcript: string) => void;
   onVadStatus?: (status: any) => void;
+  onTTSAudio?: (audioBase64: string, text: string) => void;
   wsUrl?: string;
   interviewId?: string;
 };
@@ -52,7 +53,10 @@ export function useVoice(options: UseVoiceOptions = {}) {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'start_recording' }));
+        ws.send(JSON.stringify({ 
+          type: 'start_recording',
+          interview_id: optionsRef.current.interviewId 
+        }));
         setIsRecording(true);
       };
 
@@ -72,6 +76,34 @@ export function useVoice(options: UseVoiceOptions = {}) {
           
           if (msg.type === 'speech_ended') {
             optionsRef.current.onSpeechEnd?.(msg.transcript);
+          }
+
+          // Handle TTS audio from AI
+          if (msg.type === 'tts_audio' && msg.audio) {
+            optionsRef.current.onTTSAudio?.(msg.audio, msg.text);
+            
+            // Auto-play TTS audio
+            try {
+              const byteCharacters = atob(msg.audio);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              const blob = new Blob([byteArray], { type: 'audio/wav' });
+              const audio = new Audio(URL.createObjectURL(blob));
+              audio.play();
+            } catch (e) {
+              console.error('TTS playback error:', e);
+            }
+          }
+          
+          if (msg.type === 'tts_started') {
+            setIsSpeaking(true);
+          }
+          
+          if (msg.type === 'tts_ended') {
+            setIsSpeaking(false);
           }
         } catch { /* ignore */ }
       };

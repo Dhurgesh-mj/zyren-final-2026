@@ -1,159 +1,167 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { api, Problem } from '@/lib/api';
 import {
   Brain, Code2, Mic, BarChart3, Play, ChevronRight,
-  Zap, Shield, MessageSquare, Sparkles,
+  Zap, Shield, MessageSquare, Sparkles, Activity, ArrowRight,
 } from 'lucide-react';
+
+type Problem = {
+  id: string;
+  title: string;
+  difficulty: string;
+  description: string;
+};
 
 export default function HomePage() {
   const [problems, setProblems] = useState<Problem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.getProblems()
-      .then(setProblems)
-      .catch(() => setProblems([]))
-      .finally(() => setLoading(false));
+    fetch('/api/problems')
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        setProblems(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to load problems:', err);
+        setError(err.message);
+        setLoading(false);
+      });
   }, []);
 
-  const difficultyColor: Record<string, string> = {
-    Easy: 'badge-success',
-    Medium: 'badge-warning',
-    Hard: 'badge-danger',
+  const diffColor: Record<string, string> = {
+    Easy: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
+    Medium: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
+    Hard: 'bg-rose-500/15 text-rose-400 border-rose-500/20',
   };
 
   return (
-    <div className="min-h-screen">
-      {/* ─── Hero Section ─── */}
-      <header className="relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <nav className="flex items-center justify-between mb-20">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-purple-500 flex items-center justify-center">
-                <Brain className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-xl font-bold text-white">InterviewLens</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <Link href="/history" className="btn-secondary text-sm px-4 py-2">
-                History
-              </Link>
-            </div>
-          </nav>
+    <div className="min-h-screen bg-[#0a0a0f] text-white">
 
-          <div className="text-center max-w-4xl mx-auto">
-            <div className="inline-flex items-center gap-2 badge-brand mb-6 text-sm">
-              <Sparkles className="w-4 h-4" />
-              AI-Powered Interview Practice
-            </div>
-            <h1 className="text-5xl md:text-7xl font-extrabold text-white mb-6 leading-tight">
-              Master Your
-              <br />
-              <span className="gradient-text">Technical Interview</span>
-            </h1>
-            <p className="text-lg md:text-xl text-white/60 mb-10 max-w-2xl mx-auto leading-relaxed">
-              Practice with an AI interviewer that watches you code, listens to your explanations,
-              asks dynamic follow-up questions, and generates a detailed scorecard.
-            </p>
-            <div className="flex items-center justify-center gap-4">
-              <a href="#problems" className="btn-primary text-lg px-8 py-4 flex items-center gap-2">
-                <Play className="w-5 h-5" /> Start Interview
-              </a>
-              <Link href="/history" className="btn-secondary text-lg px-8 py-4">
-                View Past Sessions
-              </Link>
-            </div>
+      {/* ─── Animated BG ─── */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-indigo-600/[0.04] rounded-full blur-[150px]" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-purple-600/[0.04] rounded-full blur-[150px]" />
+      </div>
+
+      {/* ─── Nav ─── */}
+      <nav className="relative z-10 max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <Brain className="w-5 h-5 text-white" />
           </div>
+          <span className="text-lg font-bold">InterviewLens</span>
+        </div>
+        <Link href="/history" className="text-sm text-white/40 hover:text-white/70 transition-colors">
+          History →
+        </Link>
+      </nav>
+
+      {/* ─── Hero ─── */}
+      <header className="relative z-10 max-w-6xl mx-auto px-6 pt-16 pb-24 text-center">
+        <div className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-medium px-4 py-1.5 rounded-full mb-8">
+          <Sparkles className="w-3.5 h-3.5" />
+          AI-Powered Technical Interview Practice
         </div>
 
-        {/* Decorative elements */}
-        <div className="absolute top-1/2 left-0 w-72 h-72 bg-brand-500/10 rounded-full blur-[100px] -translate-y-1/2" />
-        <div className="absolute top-1/3 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px]" />
+        <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold leading-[1.1] mb-6">
+          Master Your
+          <br />
+          <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+            Technical Interview
+          </span>
+        </h1>
+
+        <p className="text-lg text-white/40 max-w-xl mx-auto mb-10 leading-relaxed">
+          Code in a real IDE. An AI interviewer watches your code live, asks dynamic follow-ups, 
+          and scores you across technical skill, problem solving & communication.
+        </p>
+
+        <div className="flex items-center justify-center gap-4">
+          <a href="#problems" className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-7 py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:-translate-y-0.5">
+            <Play className="w-4 h-4" /> Start Practicing
+          </a>
+          <Link href="/history" className="flex items-center gap-2 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-white/60 hover:text-white/80 font-medium px-7 py-3.5 rounded-xl transition-all">
+            View History
+          </Link>
+        </div>
       </header>
 
-      {/* ─── Features Grid ─── */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* ─── Features ─── */}
+      <section className="relative z-10 max-w-6xl mx-auto px-6 pb-24">
+        <div className="grid md:grid-cols-4 gap-4">
           {[
-            {
-              icon: <Code2 className="w-6 h-6" />,
-              title: 'Live Coding',
-              desc: 'Monaco Editor with syntax highlighting, code execution, and real-time streaming.',
-              color: 'from-cyan-500 to-blue-500',
-            },
-            {
-              icon: <Brain className="w-6 h-6" />,
-              title: 'AI Interviewer',
-              desc: 'Llama 3.2 powered interviewer asks contextual follow-up questions.',
-              color: 'from-brand-500 to-purple-500',
-            },
-            {
-              icon: <Mic className="w-6 h-6" />,
-              title: 'Voice Interaction',
-              desc: 'Speak naturally — Whisper STT captures your explanation in real-time.',
-              color: 'from-emerald-500 to-teal-500',
-            },
-            {
-              icon: <BarChart3 className="w-6 h-6" />,
-              title: 'Scorecard',
-              desc: 'Get scored on technical skill, problem solving, and communication.',
-              color: 'from-amber-500 to-orange-500',
-            },
+            { icon: <Code2 className="w-5 h-5" />, title: 'Live IDE', desc: 'Monaco Editor with real-time code streaming', gradient: 'from-cyan-500 to-blue-600' },
+            { icon: <Brain className="w-5 h-5" />, title: 'AI Interviewer', desc: 'Llama 3.2 asks contextual follow-ups', gradient: 'from-indigo-500 to-purple-600' },
+            { icon: <Mic className="w-5 h-5" />, title: 'Voice Chat', desc: 'Speak your explanation naturally', gradient: 'from-emerald-500 to-teal-600' },
+            { icon: <BarChart3 className="w-5 h-5" />, title: 'Scorecard', desc: 'Detailed scoring across 3 dimensions', gradient: 'from-amber-500 to-orange-600' },
           ].map((f, i) => (
-            <div key={i} className="glass-card group">
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${f.color} flex items-center justify-center mb-4 
-                              group-hover:scale-110 transition-transform duration-300`}>
+            <div key={i} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5 hover:bg-white/[0.04] hover:border-white/[0.1] transition-all group">
+              <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${f.gradient} flex items-center justify-center mb-3 group-hover:scale-105 transition-transform`}>
                 {f.icon}
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">{f.title}</h3>
-              <p className="text-white/50 text-sm leading-relaxed">{f.desc}</p>
+              <h3 className="text-sm font-semibold text-white/80 mb-1">{f.title}</h3>
+              <p className="text-xs text-white/35 leading-relaxed">{f.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ─── Problems Section ─── */}
-      <section id="problems" className="max-w-7xl mx-auto px-6 py-20">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Choose a <span className="gradient-text">Problem</span>
+      {/* ─── Problems ─── */}
+      <section id="problems" className="relative z-10 max-w-6xl mx-auto px-6 pb-32">
+        <div className="mb-10">
+          <h2 className="text-3xl font-bold mb-2">
+            Choose a <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">Problem</span>
           </h2>
-          <p className="text-white/50 text-lg">
-            Select a coding challenge to start your interview session
-          </p>
+          <p className="text-white/35">Select a challenge to start your interview session</p>
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+          <div className="flex justify-center py-16">
+            <div className="flex items-center gap-3 text-white/30">
+              <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm">Loading problems...</span>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="text-center py-16">
+            <p className="text-white/30 text-sm mb-2">Failed to load problems</p>
+            <p className="text-white/20 text-xs mb-4">{error}</p>
+            <p className="text-white/20 text-xs">Make sure the backend is running on port 8000</p>
+          </div>
+        ) : problems.length === 0 ? (
+          <div className="text-center py-16">
+            <p className="text-white/30 text-sm">No problems available</p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {problems.map((problem) => (
               <Link
                 key={problem.id}
                 href={`/interview?problem=${problem.id}`}
-                className="glass-card group cursor-pointer"
+                className="group bg-white/[0.02] border border-white/[0.06] rounded-xl p-5 hover:bg-white/[0.04] hover:border-indigo-500/20 transition-all hover:-translate-y-0.5"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className={difficultyColor[problem.difficulty] || 'badge-brand'}>
+                <div className="flex items-start justify-between mb-3">
+                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider border ${diffColor[problem.difficulty] || 'bg-white/10 text-white/50 border-white/10'}`}>
                     {problem.difficulty}
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-white/30 group-hover:text-brand-400 
-                                           group-hover:translate-x-1 transition-all duration-300" />
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-white/15 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-3 group-hover:text-brand-300 transition-colors">
+                <h3 className="text-base font-semibold text-white/80 mb-2 group-hover:text-indigo-300 transition-colors">
                   {problem.title}
                 </h3>
-                <p className="text-white/40 text-sm line-clamp-3 leading-relaxed">
+                <p className="text-xs text-white/30 line-clamp-2 leading-relaxed mb-3">
                   {problem.description}
                 </p>
-                <div className="mt-4 flex items-center gap-2 text-brand-400 text-sm font-medium opacity-0 
-                                group-hover:opacity-100 transition-opacity duration-300">
-                  <Play className="w-4 h-4" /> Start Interview
+                <div className="flex items-center gap-1.5 text-indigo-400/60 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Play className="w-3 h-3" /> Start Interview
                 </div>
               </Link>
             ))}
@@ -162,62 +170,36 @@ export default function HomePage() {
       </section>
 
       {/* ─── How It Works ─── */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            How It <span className="gradient-text-accent">Works</span>
-          </h2>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8">
+      <section className="relative z-10 max-w-6xl mx-auto px-6 pb-32">
+        <h2 className="text-3xl font-bold text-center mb-12">
+          How It <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">Works</span>
+        </h2>
+        <div className="grid md:grid-cols-3 gap-6">
           {[
-            {
-              step: '01',
-              icon: <Zap className="w-6 h-6" />,
-              title: 'Start Coding',
-              desc: 'Pick a problem and start writing your solution in the Monaco editor.',
-            },
-            {
-              step: '02',
-              icon: <MessageSquare className="w-6 h-6" />,
-              title: 'AI Interviews You',
-              desc: 'The AI analyzes your code in real-time and asks smart follow-up questions.',
-            },
-            {
-              step: '03',
-              icon: <Shield className="w-6 h-6" />,
-              title: 'Get Your Scorecard',
-              desc: 'Receive a detailed evaluation across technical, problem-solving, and communication.',
-            },
+            { step: '01', icon: <Zap className="w-5 h-5 text-amber-400" />, title: 'Start Coding', desc: 'Pick a problem and write your solution in the Monaco editor.' },
+            { step: '02', icon: <Activity className="w-5 h-5 text-indigo-400" />, title: 'AI Watches Live', desc: 'As you code, the AI analyzes patterns and asks real-time follow-up questions.' },
+            { step: '03', icon: <Shield className="w-5 h-5 text-emerald-400" />, title: 'Get Scored', desc: 'Receive a detailed scorecard across technical skill, problem solving & communication.' },
           ].map((s, i) => (
-            <div key={i} className="relative glass-card text-center">
-              <div className="text-6xl font-black text-brand-500/10 absolute top-4 left-6">
-                {s.step}
+            <div key={i} className="relative bg-white/[0.02] border border-white/[0.06] rounded-xl p-6 text-center">
+              <span className="absolute top-4 right-5 text-4xl font-black text-white/[0.03]">{s.step}</span>
+              <div className="w-12 h-12 rounded-xl bg-white/[0.04] flex items-center justify-center mx-auto mb-4">
+                {s.icon}
               </div>
-              <div className="relative z-10 pt-8">
-                <div className="w-14 h-14 rounded-2xl glass flex items-center justify-center mx-auto mb-5">
-                  {s.icon}
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-3">{s.title}</h3>
-                <p className="text-white/50 leading-relaxed">{s.desc}</p>
-              </div>
+              <h3 className="text-sm font-semibold text-white/80 mb-2">{s.title}</h3>
+              <p className="text-xs text-white/35 leading-relaxed">{s.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* ─── Footer ─── */}
-      <footer className="border-t border-white/5 py-8">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-purple-500 flex items-center justify-center">
-              <Brain className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-sm text-white/40">InterviewLens © 2026</span>
+      <footer className="relative z-10 border-t border-white/[0.04] py-6">
+        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Brain className="w-4 h-4 text-indigo-400/40" />
+            <span className="text-xs text-white/25">InterviewLens © 2026</span>
           </div>
-          <div className="text-sm text-white/30">
-            Powered by Llama 3.2 + Whisper
-          </div>
+          <span className="text-xs text-white/20">Powered by Llama 3.2 + Whisper</span>
         </div>
       </footer>
     </div>

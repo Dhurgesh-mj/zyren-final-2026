@@ -1,16 +1,28 @@
 """
-WebSocket handler for voice streaming.
-Handles audio input, VAD processing, and STT transcription.
+WebSocket handler for voice streaming with TTS integration.
+Handles audio input, VAD processing, STT transcription, and TTS responses.
+Enables full voice-to-voice conversation.
 """
 import json
 import logging
 import base64
+import asyncio
 from typing import Dict, Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from stt.whisper_stt import WhisperSTT
 from stt.vad import VoiceActivityDetector
+
+# TTS is optional - stub if not available
+class _StubTTS:
+    async def synthesize_speech(self, text):
+        return None
+
+try:
+    from stt.tts import TTSEngine
+except ImportError:
+    TTSEngine = _StubTTS
 
 logger = logging.getLogger("interviewlens.ws.voice")
 
@@ -23,17 +35,23 @@ voice_connections: Dict[str, dict] = {}
 @router.websocket("/ws/voice-stream")
 async def voice_stream_websocket(websocket: WebSocket):
     """
-    WebSocket endpoint for voice streaming.
+    WebSocket endpoint for voice streaming with voice-to-voice support.
     
     Messages from client:
     - { "type": "audio_chunk", "audio_data": "<base64>", "interview_id": "..." }
     - { "type": "start_recording" }
     - { "type": "stop_recording" }
+    - { "type": "get_ai_response", "text": "...", "interview_id": "..." }
+    - { "type": "stop_tts" }
     
     Messages to client:
     - { "type": "vad_status", "data": { ... } }
     - { "type": "transcript", "text": "...", "final": true/false }
-    - { "type": "speech_ended" }
+    - { "type": "speech_ended", "transcript": "..." }
+    - { "type": "ai_response", "text": "...", "audio": "<base64>" }
+    - { "type": "tts_started" }
+    - { "type": "tts_ended" }
+    - { "type": "tts_chunk", "audio": "<base64>" }
     """
     await websocket.accept()
     connection_id = str(id(websocket))
@@ -41,13 +59,17 @@ async def voice_stream_websocket(websocket: WebSocket):
     # Initialize per-connection state
     stt = WhisperSTT()
     vad = VoiceActivityDetector(silence_threshold=1.5)
+    tts = TTSEngine()
     
     voice_connections[connection_id] = {
         "websocket": websocket,
         "stt": stt,
         "vad": vad,
+        "tts": tts,
         "recording": False,
         "transcript_buffer": [],
+        "tts_active": False,
+        "interview_id": None,
     }
     
     logger.info("Voice stream connected: %s", connection_id)
@@ -62,10 +84,15 @@ async def voice_stream_websocket(websocket: WebSocket):
                 await _handle_audio_chunk(connection_id, message)
             elif msg_type == "start_recording":
                 voice_connections[connection_id]["recording"] = True
+                voice_connections[connection_id]["interview_id"] = message.get("interview_id")
                 vad.reset()
                 await websocket.send_json({"type": "recording_started"})
             elif msg_type == "stop_recording":
                 await _handle_stop_recording(connection_id)
+            elif msg_type == "get_ai_response":
+                await _handle_ai_response(connection_id, message)
+            elif msg_type == "stop_tts":
+                await _handle_stop_tts(connection_id)
             elif msg_type == "ping":
                 await websocket.send_json({"type": "pong"})
 
@@ -121,16 +148,118 @@ async def _handle_audio_chunk(connection_id: str, message: dict):
                     })
                     
                     # Signal that speech ended (AI can now respond)
+                    full_transcript = " ".join(conn["transcript_buffer"])
                     await websocket.send_json({
                         "type": "speech_ended",
                         "transcript": transcript,
-                        "full_transcript": " ".join(conn["transcript_buffer"]),
+                        "full_transcript": full_transcript,
                     })
+                    
+                    # Auto-get AI response for voice-to-voice
+                    interview_id = conn.get("interview_id")
+                    if interview_id:
+                        await _trigger_ai_response(connection_id, full_transcript, interview_id)
             
             vad.reset()
 
     except Exception as e:
         logger.error("Audio chunk processing error: %s", e)
+
+
+async def _trigger_ai_response(connection_id: str, transcript: str, interview_id: str):
+    """Trigger AI response and convert to speech."""
+    conn = voice_connections.get(connection_id)
+    if not conn:
+        return
+    
+    websocket = conn["websocket"]
+    
+    try:
+        # Get AI response from the interviewer
+        from websocket.ai_interviewer import ai_sessions
+        
+        # Find the AI session for this interview
+        ai_session = None
+        for session in ai_sessions.values():
+            if session.get("interview_id") == interview_id:
+                ai_session = session
+                break
+        
+        if not ai_session:
+            logger.warning("No AI session found for interview: %s", interview_id)
+            return
+        
+        interviewer = ai_session.get("interviewer")
+        if not interviewer:
+            return
+        
+        # Get AI response
+        conn["tts_active"] = True
+        await websocket.send_json({"type": "tts_started"})
+        
+        response = await interviewer.chat(
+            user_message=transcript,
+            code=ai_session.get("last_code"),
+            ast_analysis=ai_session.get("last_analysis"),
+        )
+        
+        # Send text response
+        await websocket.send_json({
+            "type": "ai_response",
+            "text": response,
+        })
+        
+        # Convert to speech and stream
+        await _stream_tts(connection_id, response)
+        
+    except Exception as e:
+        logger.error("AI response error: %s", e)
+    finally:
+        conn["tts_active"] = False
+        await websocket.send_json({"type": "tts_ended"})
+
+
+async def _stream_tts(connection_id: str, text: str):
+    """Stream TTS audio to the client."""
+    conn = voice_connections.get(connection_id)
+    if not conn:
+        return
+    
+    websocket = conn["websocket"]
+    tts = conn["tts"]
+    
+    try:
+        # Get audio from TTS
+        audio_bytes = await tts.synthesize_speech(text)
+        
+        if audio_bytes:
+            # Convert to base64
+            audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
+            
+            await websocket.send_json({
+                "type": "tts_audio",
+                "audio": audio_b64,
+                "text": text,
+            })
+        else:
+            logger.warning("TTS synthesis returned no audio")
+            
+    except Exception as e:
+        logger.error("TTS streaming error: %s", e)
+
+
+async def _handle_ai_response(connection_id: str, message: dict):
+    """Handle request for AI response with TTS."""
+    text = message.get("text", "")
+    if text:
+        await _stream_tts(connection_id, text)
+
+
+async def _handle_stop_tts(connection_id: str):
+    """Stop any active TTS playback."""
+    conn = voice_connections.get(connection_id)
+    if conn:
+        conn["tts_active"] = False
 
 
 async def _handle_stop_recording(connection_id: str):

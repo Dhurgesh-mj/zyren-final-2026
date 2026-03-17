@@ -1,6 +1,7 @@
 'use client';
 
-import { Mic, MicOff, Radio } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Mic, MicOff, Radio, Volume2, VolumeX, Loader2 } from 'lucide-react';
 
 type VoicePanelProps = {
   isRecording: boolean;
@@ -19,6 +20,52 @@ export default function VoicePanel({
   onStartRecording,
   onStopRecording,
 }: VoicePanelProps) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [ttsAudio, setTtsAudio] = useState<HTMLAudioElement | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  
+  // Handle TTS audio playback
+  const playAudio = useCallback((audioBase64: string) => {
+    try {
+      const byteCharacters = atob(audioBase64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'audio/wav' });
+      const url = URL.createObjectURL(blob);
+      
+      const audio = new Audio(url);
+      audio.onended = () => {
+        setIsPlaying(false);
+        URL.revokeObjectURL(url);
+      };
+      audio.play();
+      setIsPlaying(true);
+      setTtsAudio(audio);
+    } catch (err) {
+      console.error('Audio playback error:', err);
+    }
+  }, []);
+
+  // Stop audio if recording starts
+  useEffect(() => {
+    if (isRecording && ttsAudio) {
+      ttsAudio.pause();
+      setIsPlaying(false);
+    }
+  }, [isRecording, ttsAudio]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (ttsAudio) {
+        ttsAudio.pause();
+      }
+    };
+  }, [ttsAudio]);
+
   return (
     <div className="glass rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
@@ -33,6 +80,13 @@ export default function VoicePanel({
             <span className="text-xs text-white/50">
               {isSpeaking ? 'Listening...' : 'Waiting for speech...'}
             </span>
+          </div>
+        )}
+        
+        {isSpeaking && !isRecording && (
+          <div className="flex items-center gap-2">
+            <Loader2 className="w-3 h-3 text-brand-400 animate-spin" />
+            <span className="text-xs text-brand-400">AI Speaking...</span>
           </div>
         )}
       </div>
@@ -84,6 +138,12 @@ export default function VoicePanel({
           <p className="text-sm text-white/70 line-clamp-3">{transcript}</p>
         </div>
       )}
+
+      {/* Voice mode indicator */}
+      <div className="mt-3 flex items-center justify-center gap-2 text-xs text-white/30">
+        <Volume2 className="w-3 h-3" />
+        <span>Voice-to-Voice Mode</span>
+      </div>
 
       {/* Error */}
       {error && (

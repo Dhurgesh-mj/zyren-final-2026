@@ -80,6 +80,14 @@ export const api = {
     });
   },
 
+  // Test runner
+  async runTests(problemId: string, code: string, language: string = 'python') {
+    return this.fetch(`/api/run-tests?problem_id=${problemId}&language=${language}`, {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  },
+
   // WebSocket connections
   createCodeStreamWS() {
     return new WebSocket(`${getWsUrl()}/ws/code-stream`);

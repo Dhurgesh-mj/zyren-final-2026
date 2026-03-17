@@ -15,6 +15,7 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { useVoice } from '@/hooks/useVoice';
 import dynamic from 'next/dynamic';
 import Scorecard from '@/components/Scorecard';
+import TestResults from '@/components/TestResults';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
@@ -61,6 +62,10 @@ function InterviewContent() {
   const [showScorecard, setShowScorecard] = useState(false);
   const [loading, setLoading] = useState(true);
   const [liveIndicator, setLiveIndicator] = useState(false);
+  
+  // Test runner state
+  const [testResults, setTestResults] = useState<any>(null);
+  const [isRunningTests, setIsRunningTests] = useState(false);
 
   const transcriptRef = useRef('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -226,6 +231,21 @@ function InterviewContent() {
       .catch(console.error)
       .finally(() => setIsRunning(false));
   }, [code, language]);
+
+  // ─── Run Tests ─────────────────────────────────────────
+  const runTests = useCallback(async () => {
+    if (!problem) return;
+    setIsRunningTests(true);
+    setTestResults(null);
+    try {
+      const result = await api.runTests(problem.id, code, language);
+      setTestResults(result);
+    } catch (err) {
+      console.error('Test run failed:', err);
+    } finally {
+      setIsRunningTests(false);
+    }
+  }, [problem, code, language]);
 
   // ─── Send Chat Message ────────────────────────────────
   const sendMessage = useCallback((text: string) => {
@@ -479,6 +499,18 @@ function InterviewContent() {
                 </div>
               )}
               <button
+                onClick={runTests}
+                disabled={isRunningTests}
+                className="flex items-center gap-1.5 bg-indigo-600/90 hover:bg-indigo-500 disabled:bg-white/10 disabled:text-white/30 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all backdrop-blur-sm"
+              >
+                {isRunningTests ? (
+                  <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <CheckCircle className="w-3 h-3" />
+                )}
+                {isRunningTests ? 'Testing...' : 'Tests'}
+              </button>
+              <button
                 onClick={runCode}
                 disabled={isRunning}
                 className="flex items-center gap-1.5 bg-emerald-600/90 hover:bg-emerald-500 disabled:bg-white/10 disabled:text-white/30 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all backdrop-blur-sm"
@@ -519,6 +551,19 @@ function InterviewContent() {
                   <p className="text-white/20 italic">No output</p>
                 )}
               </div>
+            </div>
+            )}
+          
+          {/* Test Results panel */}
+          {testResults && (
+            <div className="border-t border-white/[0.06] bg-[#0d0d15]">
+              <TestResults
+                results={testResults.results || []}
+                totalTests={testResults.total_tests || 0}
+                passed={testResults.passed || 0}
+                failed={testResults.failed || 0}
+                isRunning={isRunningTests}
+              />
             </div>
           )}
         </div>
