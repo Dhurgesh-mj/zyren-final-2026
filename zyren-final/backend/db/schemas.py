@@ -73,7 +73,7 @@ class ScorecardResponse(BaseModel):
 
 class CodeExecutionRequest(BaseModel):
     code: str
-    language: str = Field(default="python", pattern="^(python|javascript)$")
+    language: str = Field(default="python", pattern="^(python|javascript|java|cpp|c|go|rust|typescript)$")
     stdin: str = ""
 
 

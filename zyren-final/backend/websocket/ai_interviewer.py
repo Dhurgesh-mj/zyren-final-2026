@@ -172,6 +172,11 @@ async def _handle_code_update(websocket: WebSocket, connection_id: str, message:
     interview_id = session["interview_id"]
     interviewer = session["interviewer"]
 
+    # Skip very short code (user just started typing)
+    if len(code.strip()) < 20:
+        session["last_code"] = code
+        return
+
     # Update stored code and mark as changed
     session["last_code"] = code
     interviewer.code_context = code
@@ -190,31 +195,56 @@ async def _handle_code_update(websocket: WebSocket, connection_id: str, message:
     # Check for new patterns (that weren't in previous analysis)
     new_detections = new_patterns - prev_patterns
     
-    if new_detections and session["message_count"] > 0:
+    # Skip patterns that always appear on first keystrokes
+    trivial_patterns = {"no_error_handling", "global_state"}
+    meaningful_detections = new_detections - trivial_patterns
+    
+    if meaningful_detections:
         # Notify client about detected patterns
         await websocket.send_json({
             "type": "analysis_trigger",
-            "patterns": list(new_detections),
+            "patterns": list(meaningful_detections),
         })
 
-        # Generate follow-up question based on new patterns
-        await websocket.send_json({"type": "ai_typing", "status": True})
-        
-        follow_up = await interviewer.generate_follow_up(
-            code=code,
-            ast_analysis=analysis,
-        )
+        # Check cooldown
+        import time
+        current_time = time.time()
+        if current_time - interviewer.last_question_time < interviewer.QUESTION_COOLDOWN:
+            return
 
-        if follow_up:
+        # Use the analyzer's suggested questions directly, or ask AI
+        suggested = analysis.get("suggested_questions", [])
+        
+        if suggested:
+            # Use the first relevant suggested question
+            question = suggested[0]
+            
+            # Avoid repeating the same question
+            if question in interviewer.questions_asked[-5:]:
+                return
+            
+            interviewer.questions_asked.append(question)
+            interviewer.last_question_time = current_time
+            
+            await websocket.send_json({"type": "ai_typing", "status": True})
+            
+            # Use AI to make the question more contextual
+            enriched_response = await interviewer.chat(
+                user_message=f"[The candidate just wrote code that uses: {', '.join(meaningful_detections)}. "
+                             f"Ask them about it naturally, as an interviewer would. "
+                             f"Suggested angle: {question}]",
+                code=code,
+                ast_analysis=analysis,
+            )
+            
             await websocket.send_json({"type": "ai_typing", "status": False})
             await websocket.send_json({
                 "type": "follow_up",
-                "content": follow_up,
-                "patterns": list(new_detections),
+                "content": enriched_response,
+                "patterns": list(meaningful_detections),
             })
-            await _save_message(interview_id, "assistant", follow_up)
-        else:
-            await websocket.send_json({"type": "ai_typing", "status": False})
+            await _save_message(interview_id, "assistant", enriched_response)
+            session["message_count"] += 1
 
 
 async def _handle_transcript(websocket: WebSocket, connection_id: str, message: dict):
