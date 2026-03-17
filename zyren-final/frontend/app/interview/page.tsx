@@ -8,11 +8,12 @@ import {
   X, AlertTriangle, CheckCircle, ArrowLeft,
   Mic, MicOff, Radio, Send, Bot, User,
   Sparkles, Clock, ChevronDown, Code2,
-  Eye, EyeOff, Zap, Activity
+  Eye, EyeOff, Zap, Activity, Volume2, VolumeX
 } from 'lucide-react';
 import { api, type Problem, type ASTAnalysis, type ExecutionResult } from '@/lib/api';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useVoice } from '@/hooks/useVoice';
+import { useAIVoice } from '@/hooks/useAIVoice';
 import dynamic from 'next/dynamic';
 import Scorecard from '@/components/Scorecard';
 import TestResults from '@/components/TestResults';
@@ -112,18 +113,24 @@ function InterviewContent() {
     }
   );
 
+  // ─── AI Voice (Text-to-Speech for AI responses) ────────
+  const aiVoice = useAIVoice({ enabled: true, rate: 1.05, pitch: 1.0 });
+
   // ─── WebSocket: AI Interviewer ─────────────────────────
   const aiWS = useWebSocket(
     `${api.wsUrl}/ws/ai-interviewer`,
     {
       onMessage: (msg) => {
         if (msg.type === 'ai_message' || msg.type === 'follow_up') {
+          const content = msg.content;
           setMessages(prev => [...prev, {
             role: 'assistant',
-            content: msg.content,
+            content,
             timestamp: Date.now(),
           }]);
           setIsAITyping(false);
+          // Speak the AI response aloud
+          aiVoice.speak(content);
         }
         if (msg.type === 'ai_typing') {
           setIsAITyping(msg.status);
@@ -196,6 +203,7 @@ function InterviewContent() {
     if (!interviewId) return;
     setStatus('ending');
     voice.stopRecording();
+    aiVoice.stop();
     try {
       const result = await api.endInterview(interviewId, {
         code_snapshot: code,
@@ -589,11 +597,30 @@ function InterviewContent() {
                 </p>
               </div>
             </div>
-            {isAITyping && (
-              <span className="text-[10px] text-indigo-400 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> Thinking
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {isAITyping && (
+                <span className="text-[10px] text-indigo-400 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" /> Thinking
+                </span>
+              )}
+              {aiVoice.isSpeaking && (
+                <span className="text-[10px] text-purple-400 flex items-center gap-1">
+                  <Volume2 className="w-3 h-3 animate-pulse" /> Speaking
+                </span>
+              )}
+              {/* AI Voice toggle */}
+              <button
+                onClick={aiVoice.toggle}
+                title={aiVoice.enabled ? 'Mute AI voice' : 'Unmute AI voice'}
+                className={`p-1 rounded transition-colors ${
+                  aiVoice.enabled
+                    ? 'text-purple-400 hover:bg-purple-500/10'
+                    : 'text-white/20 hover:bg-white/5'
+                }`}
+              >
+                {aiVoice.enabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+              </button>
+            </div>
           </div>
 
           {/* Voice indicator bar */}
